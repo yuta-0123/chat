@@ -1,7 +1,7 @@
 <template>
   <div class="m-4 p-4 bg-white shadow rounded">
     <h2 class="text-2xl text-center text-darkGray">アカウント登録</h2>
-    <form>
+    <form @submit.prevent="onSubmit">
       <div class="flex items-center justify-center flex-col w-full h-full mt-8">
         <div
           :class="{ 'border-red-500': form.imageUrl.errorMessage }"
@@ -40,6 +40,7 @@
            :class="{ 'border-red-500': form.name.errorMessage }"
           type="text"
           class="block w-full py-3 px-4 appearance-none bg-gray-200 text-darkGray border rounded leading-tight focus:outline-none focus:bg-white"
+          @blur="validateName"
         />
         <span v-show="form.name.errorMessage" class="text-red text-sm">{{form.name.errorMessage}}</span>
       </div>
@@ -57,6 +58,7 @@
 </template>
 
 <script>
+import { mapMutations } from 'vuex'
 export default {
   data() {
     return {
@@ -74,7 +76,13 @@ export default {
       }
     }
   },
+  computed: {
+    isValidateError() {
+      return this.form.name.errorMessage || this.form.imageUrl.errorMessage
+    }
+  },
   methods: {
+      ...mapMutations('alert', ['setMessage']),
       selectImage() {
           this.$refs.image.click()
       },
@@ -106,7 +114,10 @@ export default {
       // ファイルを適用してファイルアップロード開始
       const snapShot = await imageRef.put(localImageFile)
       this.form.imageUrl.val = await snapShot.ref.getDownloadURL()
+
+      this.validateImageUrl()
     },
+
 
      validateName() {
         const { name } = this.form
@@ -135,6 +146,30 @@ export default {
 
         imageUrl.errorMessage = null
     },
+
+    async onSubmit() {
+      const user = await this.$auth()
+
+      // 未ログインの場合
+      if (!user) this.$router.push('/login')
+
+        this.validateName();
+        this.validateImageUrl();
+
+      if (this.isValidateError) return
+      try {
+        await this.$firestore
+          .collection("users")
+          .doc(user.uid)
+          .set({
+            name: this.form.name.val,
+            iconImageUrl: this.form.imageUrl.val
+          })
+        this.$router.push('/')
+      } catch (e) {
+        this.setMessage({ message: '登録に失敗しました。' })
+      }
+    }
   }
 }
 </script>
